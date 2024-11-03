@@ -83,9 +83,9 @@ func newAssignment(text string) (*assignment, error) {
 }
 
 type coworker struct {
-	annoyance     uint64
-	delta         uint64
-	nextAnnoyance uint64
+	annoyance     uint
+	delta         uint
+	nextAnnoyance uint
 }
 
 func (c *coworker) String() string {
@@ -104,23 +104,23 @@ func newCoworker(text string) (*coworker, error) {
 	}, nil
 }
 
-func parseLine(text string) (uint64, uint64, error) {
+func parseLine(text string) (uint, uint, error) {
 	parts := strings.Split(text, " ")
 	if len(parts) != 2 {
 		return 0, 0, fmt.Errorf("expected 2, but got %d parts", len(parts))
 	}
-	nr1, err := strconv.ParseUint(parts[0], 10, 64)
+	nr1, err := strconv.ParseUint(parts[0], 10, 32)
 	if err != nil {
 		return 0, 0, err
 	}
-	nr2, err := strconv.ParseUint(parts[1], 10, 64)
+	nr2, err := strconv.ParseUint(parts[1], 10, 32)
 	if err != nil {
 		return 0, 0, err
 	}
-	return nr1, nr2, nil
+	return uint(nr1), uint(nr2), nil
 }
 
-func askForHelp(coworkers []*coworker, helpsNeeded int) uint64 {
+func askForHelp(coworkers []*coworker, helpsNeeded int) uint {
 	for i := 0; i < helpsNeeded; i++ {
 		leastAnnoyed := coworkers[0]
 		for _, co := range coworkers[1:] {

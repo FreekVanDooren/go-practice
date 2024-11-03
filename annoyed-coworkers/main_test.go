@@ -1,14 +1,73 @@
 package main
 
 import (
+	"bytes"
+	"embed"
 	"io"
+	"io/fs"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
 
+//go:embed data/*.ans
+//go:embed data/*.in
+var testData embed.FS
+
+func TestCases(t *testing.T) {
+	var testFiles []string
+	err := fs.WalkDir(testData, "data", func(path string, d fs.DirEntry, err error) error {
+		if d.IsDir() {
+			return nil
+		}
+		testFiles = append(testFiles, path)
+		return nil
+	})
+	if err != nil {
+		t.Errorf("No error expected, got %v", err)
+	}
+	testCases := map[string]string{}
+	answer := func(fileName string) string {
+		answerFile := strings.ReplaceAll(fileName, ".in", ".ans")
+		for _, testFile := range testFiles {
+			if testFile == answerFile {
+				return testFile
+			}
+		}
+		return ""
+	}
+	for _, fileName := range testFiles {
+		if strings.HasSuffix(fileName, ".in") {
+			testCases[fileName] = answer(fileName)
+		}
+	}
+	for caseFile, answerFile := range testCases {
+		testCase, err := testData.ReadFile(caseFile)
+		if err != nil {
+			t.Errorf("No error expected, got %v", err)
+		}
+		wantRaw, err := testData.ReadFile(answerFile)
+		if err != nil {
+			t.Errorf("No error expected, got %v", err)
+		}
+		wantStr := strings.TrimSpace(string(wantRaw))
+		want, err := strconv.ParseUint(wantStr, 10, 32)
+		if err != nil {
+			t.Errorf("No error expected, got %v", err)
+		}
+		t.Run(caseFile, func(t *testing.T) {
+			a, coworkers := readData(bytes.NewReader(testCase))
+			got := askForHelp(coworkers, a.helpsNeeded)
+			if uint(want) != got {
+				t.Errorf("Want %v, got %v", want, got)
+			}
+		})
+	}
+}
+
 func TestAskForHelp1(t *testing.T) {
-	expected := uint64(7)
+	expected := uint(7)
 	input := []*coworker{{
 		1, 2, 3,
 	}, {
@@ -24,7 +83,7 @@ func TestAskForHelp1(t *testing.T) {
 }
 
 func TestAskForHelp1a(t *testing.T) {
-	expected := uint64(5)
+	expected := uint(5)
 	input := []*coworker{{
 		1, 2, 3,
 	}, {
@@ -40,7 +99,7 @@ func TestAskForHelp1a(t *testing.T) {
 }
 
 func TestAskForHelp1b(t *testing.T) {
-	expected := uint64(5)
+	expected := uint(5)
 	input := []*coworker{{
 		1, 2, 3,
 	}, {
@@ -56,7 +115,7 @@ func TestAskForHelp1b(t *testing.T) {
 }
 
 func TestAskForHelp1c(t *testing.T) {
-	expected := uint64(4)
+	expected := uint(4)
 	input := []*coworker{{
 		1, 2, 3,
 	}, {
@@ -72,7 +131,7 @@ func TestAskForHelp1c(t *testing.T) {
 }
 
 func TestAskForHelp1d(t *testing.T) {
-	expected := uint64(7)
+	expected := uint(7)
 	input := []*coworker{{
 		1, 2, 3,
 	}, {
@@ -88,7 +147,7 @@ func TestAskForHelp1d(t *testing.T) {
 }
 
 func TestAskForHelp1e(t *testing.T) {
-	expected := uint64(8)
+	expected := uint(8)
 	input := []*coworker{{
 		1, 2, 3,
 	}, {
@@ -104,7 +163,7 @@ func TestAskForHelp1e(t *testing.T) {
 }
 
 func TestAskForHelp2(t *testing.T) {
-	expected := uint64(1002)
+	expected := uint(1002)
 	input := []*coworker{{
 		1, 1000, 1001,
 	}, {
@@ -115,7 +174,7 @@ func TestAskForHelp2(t *testing.T) {
 	}
 }
 func TestAskForHelp3(t *testing.T) {
-	expected := uint64(5)
+	expected := uint(5)
 	input := []*coworker{{
 		1, 1, 2,
 	}, {
@@ -126,7 +185,7 @@ func TestAskForHelp3(t *testing.T) {
 	}
 }
 func TestAskForHelp3a(t *testing.T) {
-	expected := uint64(4)
+	expected := uint(4)
 	input := []*coworker{{
 		1, 1, 2,
 	}, {
@@ -137,7 +196,7 @@ func TestAskForHelp3a(t *testing.T) {
 	}
 }
 func TestAskForHelp3b(t *testing.T) {
-	expected := uint64(4)
+	expected := uint(4)
 	input := []*coworker{{
 		1, 1, 2,
 	}, {
