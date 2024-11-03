@@ -38,7 +38,7 @@ func TestCases(t *testing.T) {
 		return ""
 	}
 	for _, fileName := range testFiles {
-		if strings.HasSuffix(fileName, ".in") && !strings.Contains(fileName, "biginput") {
+		if strings.HasSuffix(fileName, ".in") {
 			testCases[fileName] = answer(fileName)
 		}
 	}
