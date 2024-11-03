@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -84,98 +83,125 @@ func newBedAvailability(text string) (*bedAvailability, error) {
 }
 
 type kitten struct {
-	arrive uint64
-	leave  uint64
-	next   *kitten
-	hasBed bool
+	arrive             uint
+	leave              uint
+	stay               uint
+	next               *kitten
+	hasBed             bool
+	kittensCanShareBed uint
+	hasPrevious        bool
 }
 
 func (c *kitten) String() string {
 	return fmt.Sprintf("%+v", *c)
 }
 
-func (c *kitten) nrOfBedsOccupied() uint64 {
-	c.hasBed = true
+func (c *kitten) nrOfBedsOccupied() uint {
 	if c.next != nil {
 		return c.next.nrOfBedsOccupied() + 1
 	}
 	return 1
 }
 
+func (c *kitten) setNext(next *kitten) {
+	c.next = next
+	if next != nil {
+		next.hasPrevious = true
+	}
+}
+
+func (c *kitten) markHasBed() {
+	c.hasBed = true
+	if c.next != nil {
+		c.next.markHasBed()
+	}
+}
+
 func newKitten(text string) (*kitten, error) {
-	initial, delta, err := parseLine(text)
+	arrive, leave, err := parseLine(text)
 	if err != nil {
 		return nil, err
 	}
 	return &kitten{
-		arrive: initial,
-		leave:  delta,
+		arrive: arrive,
+		leave:  leave,
+		stay:   leave - arrive,
 	}, nil
 }
 
-func parseLine(text string) (uint64, uint64, error) {
+func parseLine(text string) (uint, uint, error) {
 	parts := strings.Split(text, " ")
 	if len(parts) != 2 {
 		return 0, 0, fmt.Errorf("expected 2, but got %d parts", len(parts))
 	}
-	nr1, err := strconv.ParseUint(parts[0], 10, 64)
+	nr1, err := strconv.ParseUint(parts[0], 10, 32)
 	if err != nil {
 		return 0, 0, err
 	}
-	nr2, err := strconv.ParseUint(parts[1], 10, 64)
+	nr2, err := strconv.ParseUint(parts[1], 10, 32)
 	if err != nil {
 		return 0, 0, err
 	}
-	return nr1, nr2, nil
+	return uint(nr1), uint(nr2), nil
 }
 
-type byArrival []*kitten
-
-func (a byArrival) Len() int           { return len(a) }
-func (a byArrival) Less(i, j int) bool { return a[i].arrive < a[j].arrive }
-func (a byArrival) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-
-func maximumHoused(kittens []*kitten, beds int) uint64 {
-	sort.Sort(byArrival(kittens))
-
-	for i, k := range kittens {
-		k.next = findNext(kittens[i+1:], k)
-	}
-
-	c := make(chan uint64)
-	for i := 0; i < beds; i++ {
-		var nextKittenToBed *kitten
-		for _, k := range kittens[i:] {
-			if !k.hasBed {
-				nextKittenToBed = k
-				break
-			}
-		}
-		go func(k *kitten) {
-			bedsOccupied := k.nrOfBedsOccupied()
-			c <- bedsOccupied
-		}(nextKittenToBed)
-	}
-	var housed uint64
-	var valuesReceived int
-	for {
-		select {
-		case bedsOccupied := <-c:
-			housed += bedsOccupied
-			valuesReceived++
-		default:
-			if valuesReceived == beds {
-				return housed
-			}
-		}
-	}
-}
-
-func findNext(kittens []*kitten, current *kitten) *kitten {
+func maximumHoused(kittens []*kitten, beds int) uint {
+	arrivals := map[uint][]*kitten{}
+	var lastDay uint
+	var housed uint
 	for _, k := range kittens {
-		if k.arrive >= current.leave {
-			return k
+		arrivals[k.arrive] = append(arrivals[k.arrive], k)
+		if lastDay < k.leave {
+			lastDay = k.leave
 		}
 	}
-	return nil
+	noBeds := kittens
+	for b := 0; b < beds; b++ {
+		if b != 0 {
+			noBeds = []*kitten{}
+			arrivals = map[uint][]*kitten{}
+			for _, k := range kittens {
+				if !k.hasBed {
+					noBeds = append(noBeds, k)
+					arrivals[k.arrive] = append(arrivals[k.arrive], k)
+				}
+			}
+		}
+		for _, k := range noBeds {
+			var candidates []*kitten
+			for i := k.leave; i < lastDay; i++ {
+				candidates = append(candidates, arrivals[i]...)
+			}
+			if len(candidates) == 0 {
+				continue
+			}
+			var next *kitten
+			for _, candidate := range candidates {
+				if next == nil {
+					next = candidate
+					continue
+				}
+				if candidate.leave <= next.leave && candidate.stay < next.stay {
+					next = candidate
+				}
+			}
+			k.setNext(next)
+		}
+		var bestCandidate *kitten
+		for _, k := range noBeds {
+			k.kittensCanShareBed = k.nrOfBedsOccupied()
+			if bestCandidate == nil {
+				bestCandidate = k
+				continue
+			}
+			if k.kittensCanShareBed > bestCandidate.kittensCanShareBed {
+				bestCandidate = k
+			}
+		}
+		if bestCandidate != nil {
+			housed += bestCandidate.kittensCanShareBed
+			bestCandidate.markHasBed()
+		}
+	}
+	return housed
 }
