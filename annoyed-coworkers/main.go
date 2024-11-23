@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"container/heap"
 	"errors"
 	"fmt"
 	"io"
@@ -120,16 +121,38 @@ func parseLine(text string) (uint, uint, error) {
 	return uint(nr1), uint(nr2), nil
 }
 
-func askForHelp(coworkers []*coworker, helpsNeeded int) uint {
+type csHeap []*coworker
+
+func (cs *csHeap) Len() int { return len(*cs) }
+
+func (cs *csHeap) Swap(i, j int) {
+	h := *cs
+	h[i], h[j] = h[j], h[i]
+}
+
+func (cs *csHeap) Push(x any) {
+	*cs = append(*cs, x.(*coworker))
+}
+
+func (cs *csHeap) Pop() any {
+	h := *cs
+	n := len(h)
+	*cs = h[0 : n-1]
+	return h[n-1]
+}
+
+func (cs *csHeap) Less(i, j int) bool {
+	h := *cs
+	return h[i].nextAnnoyance < h[j].nextAnnoyance
+}
+
+func askForHelp(coworkers csHeap, helpsNeeded int) uint {
+	heap.Init(&coworkers)
 	for i := 0; i < helpsNeeded; i++ {
 		leastAnnoyed := coworkers[0]
-		for _, co := range coworkers[1:] {
-			if co.nextAnnoyance < leastAnnoyed.nextAnnoyance {
-				leastAnnoyed = co
-			}
-		}
 		leastAnnoyed.annoyance = leastAnnoyed.nextAnnoyance
 		leastAnnoyed.nextAnnoyance += leastAnnoyed.delta
+		heap.Fix(&coworkers, 0)
 	}
 	mostAnnoyed := coworkers[0]
 	for _, co := range coworkers[1:] {
